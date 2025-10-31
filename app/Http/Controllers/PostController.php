@@ -2,25 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Post;
 use Illuminate\Http\Request;
+use App\Models\Post;
+use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
 
 class PostController extends Controller
 {
+    /**
+     * Display a listing of the posts using an Inertia page.
+     */
     public function index()
     {
-        $posts = Post::all();
-        return view('posts.index', ['posts' => $posts]);
+        $posts = Post::latest()->get();
+        return Inertia::render('PostsIndex', [
+            'posts' => $posts,
+        ]);
     }
 
+    /**
+     * Store a newly created post in storage.
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'title' => 'required',
-            'body' => 'required',
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
         ]);
+        // attach user_id if authenticated and posts table supports it
+        if (Auth::check()) {
+            $validated['user_id'] = Auth::id();
+        }
 
-        Post::create($request->all());
-        return redirect()->route('posts.index')->with('success', 'Post created!');
+        $post = Post::create($validated);
+
+        return response()->json([
+            'message' => 'Post created successfully',
+            'post' => $post
+        ], 201);
     }
 }
