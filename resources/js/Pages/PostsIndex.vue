@@ -49,58 +49,120 @@ async function submit() {
 </script>
 
 <template>
-    <div class="max-w-3xl mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">Posts</h1>
+    <div
+        class="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 py-8 px-4"
+    >
+        <div class="max-w-5xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1
+                    class="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2"
+                >
+                    Posts
+                </h1>
+                <p class="text-gray-600">Share your thoughts with the world</p>
+            </div>
 
-        <form @submit.prevent="submit" class="mb-6">
-            <div class="mb-2">
+            <!-- Create Form -->
+            <form
+                @submit.prevent="submit"
+                class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-6 mb-8 border border-purple-100"
+            >
                 <input
                     v-model="title"
-                    placeholder="Title"
-                    class="w-full p-2 border rounded"
+                    placeholder="Post title..."
+                    class="w-full px-4 py-3 border-2 border-purple-100 rounded-xl mb-3 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none"
                 />
-                <div v-if="errors.title" class="text-red-600 text-sm mt-1">
+                <div v-if="errors.title" class="text-red-500 text-sm mb-3 px-1">
                     {{ errors.title[0] }}
                 </div>
-            </div>
 
-            <div class="mb-2">
                 <textarea
                     v-model="body"
-                    placeholder="Body"
-                    class="w-full p-2 border rounded"
+                    placeholder="What's on your mind?"
+                    rows="4"
+                    class="w-full px-4 py-3 border-2 border-purple-100 rounded-xl mb-4 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none resize-none"
                 ></textarea>
-                <div v-if="errors.content" class="text-red-600 text-sm mt-1">
+                <div
+                    v-if="errors.content"
+                    class="text-red-500 text-sm mb-3 px-1"
+                >
                     {{ errors.content[0] }}
                 </div>
+
+                <div class="flex items-center justify-between">
+                    <button
+                        :disabled="isSubmitting"
+                        type="submit"
+                        class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 transition-all"
+                    >
+                        <span v-if="!isSubmitting"> Publish</span>
+                        <span v-else>Publishing...</span>
+                    </button>
+                    <div
+                        v-if="successMessage"
+                        class="text-green-600 font-medium"
+                    >
+                        ✓ {{ successMessage }}
+                    </div>
+                    <div v-if="errors.general" class="text-red-500 text-sm">
+                        {{ errors.general[0] }}
+                    </div>
+                </div>
+            </form>
+
+            <!-- Posts Grid -->
+            <div
+                v-if="posts.length === 0"
+                class="text-center text-gray-400 py-16"
+            >
+                <div class="text-6xl mb-4">📝</div>
+                <p>No posts yet. Be the first to share!</p>
             </div>
 
-            <div class="flex items-center gap-3">
-                <button
-                    :disabled="isSubmitting"
-                    type="submit"
-                    class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+            <div v-else class="grid gap-6 md:grid-cols-2">
+                <article
+                    v-for="post in posts"
+                    :key="post.id"
+                    class="group bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-purple-100 hover:border-purple-300"
                 >
-                    <span v-if="!isSubmitting">Create</span>
-                    <span v-else>Saving...</span>
-                </button>
-
-                <div v-if="successMessage" class="text-green-600">
-                    {{ successMessage }}
-                </div>
-                <div v-if="errors.general" class="text-red-600">
-                    {{ errors.general[0] }}
-                </div>
+                    <div class="p-6">
+                        <div class="flex items-start gap-3 mb-4">
+                            <div
+                                class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-md"
+                            >
+                                {{
+                                    post.title
+                                        ? post.title.charAt(0).toUpperCase()
+                                        : "P"
+                                }}
+                            </div>
+                            <div class="flex-1">
+                                <h2
+                                    class="text-xl font-bold text-gray-800 group-hover:text-purple-600 transition"
+                                >
+                                    {{ post.title }}
+                                </h2>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ post.created_at || "Just now" }}
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed line-clamp-3">
+                            {{ post.content }}
+                        </p>
+                    </div>
+                    <div
+                        class="px-6 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-t border-purple-100"
+                    >
+                        <a
+                            href="#"
+                            class="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                            >Read more →</a
+                        >
+                    </div>
+                </article>
             </div>
-        </form>
-
-        <ul>
-            <li v-for="post in posts" :key="post.id" class="mb-4 border-b pb-2">
-                <h2 class="font-semibold">{{ post.title }}</h2>
-                <p class="text-gray-700">{{ post.content }}</p>
-            </li>
-        </ul>
-
-        <div v-if="posts.length === 0" class="text-gray-500">No posts yet.</div>
+        </div>
     </div>
 </template>
