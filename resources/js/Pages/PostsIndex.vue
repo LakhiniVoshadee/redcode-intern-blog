@@ -12,6 +12,9 @@ const props = defineProps({
 const posts = ref([...props.posts]);
 const title = ref("");
 const body = ref("");
+const category = ref("");
+const excerpt = ref("");
+const tags = ref("");
 const errors = ref({});
 const isSubmitting = ref(false);
 const successMessage = ref("");
@@ -24,6 +27,10 @@ async function submit() {
         const response = await axios.post("/posts", {
             title: title.value,
             content: body.value,
+            category: category.value,
+            excerpt: excerpt.value,
+            tags: tags.value,
+            read_time: Math.ceil(body.value.split(" ").length / 200), // Estimate read time
         });
 
         if (response.data && response.data.post) {
@@ -32,6 +39,9 @@ async function submit() {
 
         title.value = "";
         body.value = "";
+        category.value = "";
+        excerpt.value = "";
+        tags.value = "";
         successMessage.value = "Post created successfully.";
 
         setTimeout(() => (successMessage.value = ""), 3000);
@@ -77,10 +87,30 @@ async function submit() {
                     {{ errors.title[0] }}
                 </div>
 
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <input
+                        v-model="category"
+                        placeholder="Category (e.g., Tech, Lifestyle)"
+                        class="px-4 py-3 border-2 border-purple-100 rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none"
+                    />
+                    <input
+                        v-model="tags"
+                        placeholder="Tags (comma separated)"
+                        class="px-4 py-3 border-2 border-purple-100 rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none"
+                    />
+                </div>
+
+                <textarea
+                    v-model="excerpt"
+                    placeholder="Brief excerpt (optional)"
+                    rows="2"
+                    class="w-full px-4 py-3 border-2 border-purple-100 rounded-xl mb-3 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none resize-none"
+                ></textarea>
+
                 <textarea
                     v-model="body"
-                    placeholder="What's on your mind?"
-                    rows="4"
+                    placeholder="Write your post content..."
+                    rows="5"
                     class="w-full px-4 py-3 border-2 border-purple-100 rounded-xl mb-4 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none resize-none"
                 ></textarea>
                 <div
@@ -96,7 +126,7 @@ async function submit() {
                         type="submit"
                         class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 transition-all"
                     >
-                        <span v-if="!isSubmitting"> Publish</span>
+                        <span v-if="!isSubmitting">✨ Publish</span>
                         <span v-else>Publishing...</span>
                     </button>
                     <div
@@ -127,9 +157,10 @@ async function submit() {
                     class="group bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-purple-100 hover:border-purple-300"
                 >
                     <div class="p-6">
-                        <div class="flex items-start gap-3 mb-4">
+                        <!-- Header with Avatar and Meta -->
+                        <div class="flex items-start gap-3 mb-3">
                             <div
-                                class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-md"
+                                class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-md"
                             >
                                 {{
                                     post.title
@@ -139,27 +170,69 @@ async function submit() {
                             </div>
                             <div class="flex-1">
                                 <h2
-                                    class="text-xl font-bold text-gray-800 group-hover:text-purple-600 transition"
+                                    class="text-xl font-bold text-gray-800 group-hover:text-purple-600 transition mb-1"
                                 >
                                     {{ post.title }}
                                 </h2>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    {{ post.created_at || "Just now" }}
+                                <div
+                                    class="flex items-center gap-2 text-xs text-gray-500"
+                                >
+                                    <span>{{
+                                        new Date(
+                                            post.created_at
+                                        ).toLocaleDateString() || "Just now"
+                                    }}</span>
+                                    <span v-if="post.read_time"
+                                        >• {{ post.read_time }} min read</span
+                                    >
+                                    <span v-if="post.views"
+                                        >• {{ post.views }} views</span
+                                    >
                                 </div>
                             </div>
                         </div>
-                        <p class="text-gray-700 leading-relaxed line-clamp-3">
-                            {{ post.content }}
+
+                        <!-- Category Badge -->
+                        <div v-if="post.category" class="mb-3">
+                            <span
+                                class="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold"
+                            >
+                                {{ post.category }}
+                            </span>
+                        </div>
+
+                        <!-- Excerpt or Content Preview -->
+                        <p
+                            class="text-gray-700 leading-relaxed mb-3 line-clamp-3"
+                        >
+                            {{ post.excerpt || post.content }}
                         </p>
+
+                        <!-- Tags -->
+                        <div v-if="post.tags" class="flex flex-wrap gap-2 mb-3">
+                            <span
+                                v-for="tag in post.tags.split(',').slice(0, 3)"
+                                :key="tag"
+                                class="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-lg"
+                            >
+                                #{{ tag.trim() }}
+                            </span>
+                        </div>
                     </div>
+
+                    <!-- Footer -->
                     <div
-                        class="px-6 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-t border-purple-100"
+                        class="px-6 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-t border-purple-100 flex items-center justify-between"
                     >
                         <a
                             href="#"
                             class="text-sm text-purple-600 hover:text-purple-800 font-medium"
-                            >Read more →</a
                         >
+                            Read more →
+                        </a>
+                        <div class="text-xs text-gray-400">
+                            Post #{{ post.id }}
+                        </div>
                     </div>
                 </article>
             </div>
