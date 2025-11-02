@@ -46,4 +46,42 @@ class PostController extends Controller
             'post' => $post
         ], 201);
     }
+
+    /**
+     * Update the specified post in storage (no validation yet).
+     */
+    public function update(Request $request, Post $post)
+    {
+        // Basic ownership check: only owner may edit when user_id exists
+        if (!Auth::check() || ($post->user_id && $post->user_id !== Auth::id())) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Update allowed fields directly without validation (per request)
+        $data = $request->only(['title', 'content', 'category', 'excerpt', 'tags', 'read_time', 'views']);
+
+        $post->fill($data);
+        $post->save();
+
+        return response()->json([
+            'message' => 'Post updated successfully',
+            'post' => $post,
+        ], 200);
+    }
+
+    /**
+     * Remove the specified post from storage.
+     */
+    public function destroy(Post $post)
+    {
+        if (!Auth::check() || ($post->user_id && $post->user_id !== Auth::id())) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $post->delete();
+
+        return response()->json([
+            'message' => 'Post deleted successfully',
+        ], 200);
+    }
 }

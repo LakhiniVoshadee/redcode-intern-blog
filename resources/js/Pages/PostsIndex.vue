@@ -18,42 +18,113 @@ const tags = ref("");
 const errors = ref({});
 const isSubmitting = ref(false);
 const successMessage = ref("");
+const editingId = ref(null);
+
+function startEdit(post) {
+    editingId.value = post.id;
+    title.value = post.title || "";
+    body.value = post.content || "";
+    category.value = post.category || "";
+    excerpt.value = post.excerpt || "";
+    tags.value = post.tags || "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelEdit() {
+    editingId.value = null;
+    title.value = "";
+    body.value = "";
+    category.value = "";
+    excerpt.value = "";
+    tags.value = "";
+    errors.value = {};
+}
 
 async function submit() {
     errors.value = {};
     successMessage.value = "";
     isSubmitting.value = true;
+
+    const payload = {
+        title: title.value,
+        content: body.value,
+        category: category.value,
+        excerpt: excerpt.value,
+        tags: tags.value,
+        read_time: Math.max(
+            1,
+            Math.ceil(body.value.split(" ").filter(Boolean).length / 200)
+        ),
+    };
+
     try {
-        const response = await axios.post("/posts", {
-            title: title.value,
-            content: body.value,
-            category: category.value,
-            excerpt: excerpt.value,
-            tags: tags.value,
-            read_time: Math.ceil(body.value.split(" ").length / 200), // Estimate read time
-        });
-
-        if (response.data && response.data.post) {
-            posts.value.unshift(response.data.post);
+        if (editingId.value) {
+            // Update existing post
+            const response = await axios.put(
+                `/posts/${editingId.value}`,
+                payload
+            );
+            if (response.data && response.data.post) {
+                const idx = posts.value.findIndex(
+                    (p) => p.id === response.data.post.id
+                );
+                if (idx !== -1) posts.value.splice(idx, 1, response.data.post);
+            }
+            successMessage.value = "Post updated successfully.";
+            cancelEdit();
+        } else {
+            // Create new post
+            const response = await axios.post("/posts", payload);
+            if (response.data && response.data.post) {
+                posts.value.unshift(response.data.post);
+            }
+            successMessage.value = "Post created successfully.";
+            title.value = "";
+            body.value = "";
+            category.value = "";
+            excerpt.value = "";
+            tags.value = "";
         }
-
-        title.value = "";
-        body.value = "";
-        category.value = "";
-        excerpt.value = "";
-        tags.value = "";
-        successMessage.value = "Post created successfully.";
 
         setTimeout(() => (successMessage.value = ""), 3000);
     } catch (e) {
         if (e.response && e.response.status === 422) {
             errors.value = e.response.data.errors || {};
+        } else if (
+            e.response &&
+            (e.response.status === 403 || e.response.status === 401)
+        ) {
+            errors.value = {
+                general: ["You are not authorized to perform this action."],
+            };
         } else {
             console.error(e);
             errors.value = { general: ["An unexpected error occurred."] };
         }
     } finally {
         isSubmitting.value = false;
+    }
+}
+
+async function removePost(post) {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+
+    try {
+        const response = await axios.delete(`/posts/${post.id}`);
+        if (response.status === 200) {
+            const idx = posts.value.findIndex((p) => p.id === post.id);
+            if (idx !== -1) posts.value.splice(idx, 1);
+        }
+    } catch (e) {
+        if (
+            e.response &&
+            (e.response.status === 403 || e.response.status === 401)
+        ) {
+            alert("You are not authorized to delete this post.");
+        } else {
+            console.error(e);
+            alert("An error occurred while deleting the post.");
+        }
     }
 }
 </script>
@@ -121,22 +192,41 @@ async function submit() {
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <button
-                        :disabled="isSubmitting"
-                        type="submit"
-                        class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 transition-all"
-                    >
-                        <span v-if="!isSubmitting">✨ Publish</span>
-                        <span v-else>Publishing...</span>
-                    </button>
-                    <div
-                        v-if="successMessage"
-                        class="text-green-600 font-medium"
-                    >
-                        ✓ {{ successMessage }}
+                    <div class="flex items-center gap-3">
+                        <button
+                            :disabled="isSubmitting"
+                            type="submit"
+                            class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 transition-all"
+                        >
+                            <span v-if="!isSubmitting && !editingId"
+                                > Publish</span
+                            >
+                            <span v-if="!isSubmitting && editingId"
+                                >Update</span
+                            >
+                            <!-- <span v-else>Processing...</span> -->
+                        </button>
+
+                        <button
+                            v-if="editingId"
+                            type="button"
+                            @click="cancelEdit"
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg border border-gray-200 hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
                     </div>
-                    <div v-if="errors.general" class="text-red-500 text-sm">
-                        {{ errors.general[0] }}
+
+                    <div class="flex items-center gap-4">
+                        <div
+                            v-if="successMessage"
+                            class="text-green-600 font-medium"
+                        >
+                            ✓ {{ successMessage }}
+                        </div>
+                        <div v-if="errors.general" class="text-red-500 text-sm">
+                            {{ errors.general[0] }}
+                        </div>
                     </div>
                 </div>
             </form>
@@ -230,8 +320,22 @@ async function submit() {
                         >
                             Read more →
                         </a>
-                        <div class="text-xs text-gray-400">
-                            Post #{{ post.id }}
+                        <div class="flex items-center gap-3">
+                            <button
+                                @click.prevent="startEdit(post)"
+                                class="text-xs text-purple-600 hover:text-purple-800 font-medium px-3 py-1 rounded-lg border border-transparent hover:bg-purple-100"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                @click.prevent="removePost(post)"
+                                class="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg border border-transparent hover:bg-red-50"
+                            >
+                                Delete
+                            </button>
+                            <div class="text-xs text-gray-400">
+                                Post #{{ post.id }}
+                            </div>
                         </div>
                     </div>
                 </article>
