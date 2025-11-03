@@ -3,10 +3,7 @@ import { ref } from "vue";
 import axios from "axios";
 
 const props = defineProps({
-    posts: {
-        type: Array,
-        default: () => [],
-    },
+    posts: { type: Array, default: () => [] },
     pagination: {
         type: Object,
         default: () => ({
@@ -16,28 +13,25 @@ const props = defineProps({
             total: 0,
         }),
     },
-    categories: {
-        type: Array,
-        default: () => [],
-    },
-    filters: {
-        type: Object,
-        default: () => ({}),
-    },
+    categories: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
 });
 
 const posts = ref([...props.posts]);
 const pagination = ref({ ...props.pagination });
 const categories = ref([...props.categories]);
 const filters = ref({ ...props.filters });
+
 const searchQuery = ref(filters.value.search || "");
 const selectedCategory = ref(filters.value.category || "");
+const showNewCategory = ref(false);
+const newCategory = ref("");
 const currentPage = ref(
     filters.value.page || pagination.value.current_page || 1
 );
+
 const title = ref("");
 const body = ref("");
-const category = ref("");
 const excerpt = ref("");
 const tags = ref("");
 const errors = ref({});
@@ -46,7 +40,6 @@ const successMessage = ref("");
 const deletingId = ref(null);
 const editingId = ref(null);
 
-// Fetch posts with filters and pagination via AJAX
 async function fetchPosts(page = 1) {
     try {
         const params = {
@@ -72,7 +65,16 @@ function startEdit(post) {
     editingId.value = post.id;
     title.value = post.title || "";
     body.value = post.content || "";
-    category.value = post.category || "";
+    // If category exists in known categories, select it. Otherwise show new input.
+    if (post.category && categories.value.includes(post.category)) {
+        selectedCategory.value = post.category;
+        showNewCategory.value = false;
+        newCategory.value = "";
+    } else {
+        selectedCategory.value = "";
+        showNewCategory.value = !!post.category;
+        newCategory.value = post.category || "";
+    }
     excerpt.value = post.excerpt || "";
     tags.value = post.tags || "";
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -82,14 +84,15 @@ function cancelEdit() {
     editingId.value = null;
     title.value = "";
     body.value = "";
-    category.value = "";
+    selectedCategory.value = "";
+    showNewCategory.value = false;
+    newCategory.value = "";
     excerpt.value = "";
     tags.value = "";
     errors.value = {};
 }
 
 function applyFilters() {
-    // reset to page 1 on new filter
     fetchPosts(1);
 }
 
@@ -98,10 +101,15 @@ async function submit() {
     successMessage.value = "";
     isSubmitting.value = true;
 
+    const finalCategory =
+        showNewCategory.value && newCategory.value
+            ? newCategory.value.trim()
+            : selectedCategory.value;
+
     const payload = {
         title: title.value,
         content: body.value,
-        category: category.value,
+        category: finalCategory,
         excerpt: excerpt.value,
         tags: tags.value,
         read_time: Math.max(
@@ -112,7 +120,6 @@ async function submit() {
 
     try {
         if (editingId.value) {
-            // Update existing post
             const response = await axios.put(
                 `/posts/${editingId.value}`,
                 payload
@@ -124,17 +131,26 @@ async function submit() {
                 if (idx !== -1) posts.value.splice(idx, 1, response.data.post);
             }
             successMessage.value = "Post updated successfully.";
+            // if new category was used, add it to local categories
+            if (finalCategory && !categories.value.includes(finalCategory)) {
+                categories.value.unshift(finalCategory);
+            }
             cancelEdit();
         } else {
-            // Create new post
             const response = await axios.post("/posts", payload);
             if (response.data && response.data.post) {
                 posts.value.unshift(response.data.post);
             }
             successMessage.value = "Post created successfully.";
+            // add new category locally if used
+            if (finalCategory && !categories.value.includes(finalCategory)) {
+                categories.value.unshift(finalCategory);
+            }
             title.value = "";
             body.value = "";
-            category.value = "";
+            selectedCategory.value = "";
+            showNewCategory.value = false;
+            newCategory.value = "";
             excerpt.value = "";
             tags.value = "";
         }
@@ -167,8 +183,6 @@ async function removePost(post) {
         if (response.status === 200) {
             const idx = posts.value.findIndex((p) => p.id === post.id);
             if (idx !== -1) posts.value.splice(idx, 1);
-
-            // show success message briefly
             successMessage.value = "Post deleted successfully.";
             setTimeout(() => (successMessage.value = ""), 3000);
         }
@@ -221,12 +235,39 @@ async function removePost(post) {
                     {{ errors.title[0] }}
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <input
-                        v-model="category"
-                        placeholder="Category (e.g., Tech, Lifestyle)"
-                        class="px-4 py-3 border-2 border-purple-100 rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none"
-                    />
+                <div class="grid grid-cols-2 gap-3 mb-3 items-center">
+                    <div>
+                        <select
+                            v-model="selectedCategory"
+                            @change="
+                                () => {
+                                    if (selectedCategory === '__new') {
+                                        showNewCategory = true;
+                                    }
+                                }
+                            "
+                            class="w-full px-4 py-3 border-2 border-purple-100 rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition outline-none"
+                        >
+                            <option value="">Select category</option>
+                            <option
+                                v-for="cat in categories"
+                                :key="cat"
+                                :value="cat"
+                            >
+                                {{ cat }}
+                            </option>
+                            <option value="__new">Add new category...</option>
+                        </select>
+
+                        <div v-if="showNewCategory" class="mt-2">
+                            <input
+                                v-model="newCategory"
+                                placeholder="Type new category and submit"
+                                class="w-full px-4 py-2 border rounded-lg"
+                            />
+                        </div>
+                    </div>
+
                     <input
                         v-model="tags"
                         placeholder="Tags (comma separated)"
