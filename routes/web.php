@@ -27,6 +27,10 @@ Route::get('/', function () {
 // Blog Posts (public access)
 Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
 Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+// Public update/delete for posts (no auth required)
+// Accept both PUT and PATCH so frontend axios.put or axios.patch will work
+Route::match(['put', 'patch'], '/posts/{post}', [PostController::class, 'update'])->name('posts.update');
+Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
 
 // Protected routes (require authentication)
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -41,9 +45,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     
     // Post management routes (protected)
-    // Accept both PUT and PATCH so frontend axios.put or axios.patch will work
-    Route::match(['put', 'patch'], '/posts/{post}', [PostController::class, 'update'])->name('posts.update');
-    Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
 });
 
 // Authentication routes

@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Post;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
+
 
 class PostController extends Controller
 {
@@ -34,11 +34,7 @@ class PostController extends Controller
             'read_time' => 'nullable|integer|min:1',
             'views' => 'nullable|integer|min:0',
         ]);
-        // attach user_id if authenticated and posts table supports it
-        if (Auth::check()) {
-            $validated['user_id'] = Auth::id();
-        }
-
+        // No user ownership attached (public CRUD)
         $post = Post::create($validated);
 
         return response()->json([
@@ -52,11 +48,6 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
-        // Basic ownership check: only owner may edit when user_id exists
-        if (!Auth::check() || ($post->user_id && $post->user_id !== Auth::id())) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
         // Update allowed fields directly without validation (per request)
         $data = $request->only(['title', 'content', 'category', 'excerpt', 'tags', 'read_time', 'views']);
 
@@ -74,10 +65,7 @@ class PostController extends Controller
      */
     public function destroy(Post $post)
     {
-        if (!Auth::check() || ($post->user_id && $post->user_id !== Auth::id())) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
+        // Public delete (no ownership/auth checks)
         $post->delete();
 
         return response()->json([
