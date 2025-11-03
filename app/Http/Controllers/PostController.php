@@ -17,9 +17,62 @@ class PostController extends Controller
      */
     public function index()
     {
-        $posts = Post::latest()->get();
+        $request = request();
+
+        $query = Post::query()->latest();
+
+        // Search by title or content
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by category
+        if ($category = $request->query('category')) {
+            $query->where('category', $category);
+        }
+
+        // Filter by tag (simple contains match on comma-separated tags)
+        if ($tag = $request->query('tag')) {
+            $query->where('tags', 'like', "%{$tag}%");
+        }
+
+        $perPage = 6;
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        // list of available categories for the filter UI
+        $categories = Post::query()
+            ->whereNotNull('category')
+            ->distinct()
+            ->pluck('category')
+            ->filter()
+            ->values();
+
+        // If request expects JSON (AJAX), return JSON paginator shape
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'posts' => $paginator->items(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+            ]);
+        }
+
         return Inertia::render('PostsIndex', [
-            'posts' => $posts,
+            'posts' => $paginator->items(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+            'categories' => $categories,
+            'filters' => $request->only(['search', 'category', 'tag']),
         ]);
     }
 

@@ -7,9 +7,34 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    pagination: {
+        type: Object,
+        default: () => ({
+            current_page: 1,
+            last_page: 1,
+            per_page: 6,
+            total: 0,
+        }),
+    },
+    categories: {
+        type: Array,
+        default: () => [],
+    },
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const posts = ref([...props.posts]);
+const pagination = ref({ ...props.pagination });
+const categories = ref([...props.categories]);
+const filters = ref({ ...props.filters });
+const searchQuery = ref(filters.value.search || "");
+const selectedCategory = ref(filters.value.category || "");
+const currentPage = ref(
+    filters.value.page || pagination.value.current_page || 1
+);
 const title = ref("");
 const body = ref("");
 const category = ref("");
@@ -20,6 +45,28 @@ const isSubmitting = ref(false);
 const successMessage = ref("");
 const deletingId = ref(null);
 const editingId = ref(null);
+
+// Fetch posts with filters and pagination via AJAX
+async function fetchPosts(page = 1) {
+    try {
+        const params = {
+            search: searchQuery.value || undefined,
+            category: selectedCategory.value || undefined,
+            page,
+        };
+
+        const res = await axios.get("/posts", { params });
+        if (res.data && res.data.posts) {
+            posts.value = res.data.posts;
+            if (res.data.meta) {
+                pagination.value = { ...res.data.meta };
+                currentPage.value = pagination.value.current_page;
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch posts", e);
+    }
+}
 
 function startEdit(post) {
     editingId.value = post.id;
@@ -39,6 +86,11 @@ function cancelEdit() {
     excerpt.value = "";
     tags.value = "";
     errors.value = {};
+}
+
+function applyFilters() {
+    // reset to page 1 on new filter
+    fetchPosts(1);
 }
 
 async function submit() {
@@ -242,6 +294,30 @@ async function removePost(post) {
                 </div>
             </form>
 
+            <!-- Filters -->
+            <div class="flex items-center gap-3 mb-6">
+                <input
+                    v-model="searchQuery"
+                    placeholder="Search posts..."
+                    class="px-4 py-2 border rounded-lg w-1/2"
+                />
+                <select
+                    v-model="selectedCategory"
+                    class="px-4 py-2 border rounded-lg"
+                >
+                    <option value="">All categories</option>
+                    <option v-for="cat in categories" :key="cat" :value="cat">
+                        {{ cat }}
+                    </option>
+                </select>
+                <button
+                    @click.prevent="applyFilters"
+                    class="px-4 py-2 bg-purple-600 text-white rounded-lg"
+                >
+                    Filter
+                </button>
+            </div>
+
             <!-- Posts Grid -->
             <div
                 v-if="posts.length === 0"
@@ -354,6 +430,51 @@ async function removePost(post) {
                         </div>
                     </div>
                 </article>
+            </div>
+
+            <!-- Pagination -->
+            <div
+                v-if="pagination.total > pagination.per_page"
+                class="mt-8 flex items-center justify-center"
+            >
+                <div class="inline-flex gap-2">
+                    <button
+                        :disabled="currentPage === 1"
+                        @click.prevent="fetchPosts(pagination.current_page - 1)"
+                        class="px-3 py-1 bg-gray-100 rounded-lg"
+                    >
+                        Prev
+                    </button>
+
+                    <button
+                        v-for="p in Math.min(7, pagination.last_page)
+                            ? Array.from(
+                                  { length: Math.min(7, pagination.last_page) },
+                                  (_, i) => i + 1
+                              )
+                            : []"
+                        :key="p"
+                        @click.prevent="fetchPosts(p)"
+                        :class="{
+                            'bg-purple-600 text-white':
+                                p === pagination.current_page,
+                            'bg-gray-100': p !== pagination.current_page,
+                        }"
+                        class="px-3 py-1 rounded-lg"
+                    >
+                        {{ p }}
+                    </button>
+
+                    <button
+                        :disabled="
+                            pagination.current_page >= pagination.last_page
+                        "
+                        @click.prevent="fetchPosts(pagination.current_page + 1)"
+                        class="px-3 py-1 bg-gray-100 rounded-lg"
+                    >
+                        Next
+                    </button>
+                </div>
             </div>
         </div>
     </div>
