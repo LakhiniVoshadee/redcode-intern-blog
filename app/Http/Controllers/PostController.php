@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Post;
 use Inertia\Inertia;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
 
 
 class PostController extends Controller
 {
+   
     /**
      * Display a listing of the posts using an Inertia page.
      */
@@ -23,17 +26,12 @@ class PostController extends Controller
     /**
      * Store a newly created post in storage.
      */
-    public function store(Request $request)
+    public function store(StorePostRequest $request)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'content' => 'required|string',
-            'category' => 'nullable|string|max:100',
-            'excerpt' => 'nullable|string|max:500',
-            'tags' => 'nullable|string|max:255',
-            'read_time' => 'nullable|integer|min:1',
-            'views' => 'nullable|integer|min:0',
-        ]);
+        // The FormRequest will automatically validate and
+        // return a 422 JSON response for API callers when invalid.
+        $validated = $request->validated();
+
         // No user ownership attached (public CRUD)
         $post = Post::create($validated);
 
@@ -46,10 +44,10 @@ class PostController extends Controller
     /**
      * Update the specified post in storage (no validation yet).
      */
-    public function update(Request $request, Post $post)
+    public function update(UpdatePostRequest $request, Post $post)
     {
-        // Update allowed fields directly without validation (per request)
-        $data = $request->only(['title', 'content', 'category', 'excerpt', 'tags', 'read_time', 'views']);
+        // The UpdatePostRequest uses "sometimes" rules so partial updates are allowed.
+        $data = $request->validated();
 
         $post->fill($data);
         $post->save();
