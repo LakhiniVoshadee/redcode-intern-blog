@@ -18,6 +18,7 @@ const tags = ref("");
 const errors = ref({});
 const isSubmitting = ref(false);
 const successMessage = ref("");
+const deletingId = ref(null);
 const editingId = ref(null);
 
 function startEdit(post) {
@@ -108,23 +109,33 @@ async function submit() {
 
 async function removePost(post) {
     if (!confirm("Are you sure you want to delete this post?")) return;
-
+    deletingId.value = post.id;
     try {
         const response = await axios.delete(`/posts/${post.id}`);
         if (response.status === 200) {
             const idx = posts.value.findIndex((p) => p.id === post.id);
             if (idx !== -1) posts.value.splice(idx, 1);
+
+            // show success message briefly
+            successMessage.value = "Post deleted successfully.";
+            setTimeout(() => (successMessage.value = ""), 3000);
         }
     } catch (e) {
         if (
             e.response &&
             (e.response.status === 403 || e.response.status === 401)
         ) {
-            alert("You are not authorized to delete this post.");
+            errors.value = {
+                general: ["You are not authorized to delete this post."],
+            };
         } else {
             console.error(e);
-            alert("An error occurred while deleting the post.");
+            errors.value = {
+                general: ["An error occurred while deleting the post."],
+            };
         }
+    } finally {
+        deletingId.value = null;
     }
 }
 </script>
@@ -198,8 +209,8 @@ async function removePost(post) {
                             type="submit"
                             class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 transition-all"
                         >
-                            <span v-if="!isSubmitting && !editingId"
-                                > Publish</span
+                            <span v-if="!isSubmitting && !editingId">
+                                Publish</span
                             >
                             <span v-if="!isSubmitting && editingId"
                                 >Update</span
@@ -329,9 +340,13 @@ async function removePost(post) {
                             </button>
                             <button
                                 @click.prevent="removePost(post)"
-                                class="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg border border-transparent hover:bg-red-50"
+                                :disabled="deletingId === post.id"
+                                class="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg border border-transparent hover:bg-red-50 disabled:opacity-50"
                             >
-                                Delete
+                                <span v-if="deletingId === post.id"
+                                    >Deleting...</span
+                                >
+                                <span v-else>Delete</span>
                             </button>
                             <div class="text-xs text-gray-400">
                                 Post #{{ post.id }}
