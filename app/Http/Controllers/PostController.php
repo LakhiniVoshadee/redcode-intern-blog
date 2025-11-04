@@ -50,19 +50,6 @@ class PostController extends Controller
             ->filter()
             ->values();
 
-        // If request expects JSON (AJAX), return JSON paginator shape
-        if ($request->wantsJson() || $request->ajax()) {
-            return response()->json([
-                'posts' => $paginator->items(),
-                'meta' => [
-                    'current_page' => $paginator->currentPage(),
-                    'last_page' => $paginator->lastPage(),
-                    'per_page' => $paginator->perPage(),
-                    'total' => $paginator->total(),
-                ],
-            ]);
-        }
-
         return Inertia::render('PostsIndex', [
             'posts' => $paginator->items(),
             'pagination' => [
@@ -73,6 +60,44 @@ class PostController extends Controller
             ],
             'categories' => $categories,
             'filters' => $request->only(['search', 'category', 'tag']),
+        ]);
+    }
+
+    /**
+     * JSON data endpoint for client-side fetches (axios) so Inertia
+     * navigation always receives an Inertia response from `index()`.
+     */
+    public function data(Request $request)
+    {
+        $query = Post::query()->latest();
+
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%")
+                    ->orWhere('excerpt', 'like', "%{$search}%");
+            });
+        }
+
+        if ($category = $request->query('category')) {
+            $query->where('category', $category);
+        }
+
+        if ($tag = $request->query('tag')) {
+            $query->where('tags', 'like', "%{$tag}%");
+        }
+
+        $perPage = 6;
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        return response()->json([
+            'posts' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 
